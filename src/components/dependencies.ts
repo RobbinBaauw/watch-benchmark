@@ -1,12 +1,10 @@
 import { Ref, ref, reactive, WatchSource, isRef } from "vue";
 import { braidArrays, range } from "./util";
+import { amountOfKeys, arraySize } from "@/components/consts";
 
 // Amount => 1, 8, 20, 500
 // Type => ref, reactive, arrays
 // Changing => constant, little change, much change
-
-const amountOfKeys = 100;
-const arraySize = 100;
 
 export type Benchmark = {
     sourceTypes: SourceTypes;
@@ -85,7 +83,7 @@ export function createDependencies(
             switch (sourceChange) {
                 case "no": {
                     // Constant dependencies
-                    return useSources((i) => false);
+                    return useSources(() => false);
                 }
                 case "little": {
                     // We skip 1 in 20 dependencies in a rotating fashion

@@ -18,6 +18,7 @@
 <script lang="ts">
 import { defineComponent, watch, PropType, nextTick, ref } from "vue";
 import { mutateSource, createDependencies, Benchmark, Source } from "@/components/dependencies";
+import { amountOfMutations } from "@/components/consts";
 
 export default defineComponent({
     name: "Benchmark",
@@ -43,7 +44,7 @@ export default defineComponent({
             watcherInvocations.value = 0;
 
             const start = performance.now();
-            for (let i = 0; i < 10_000; i++) {
+            for (let i = 0; i < amountOfMutations; i++) {
                 mutateSource(watchSources.value[i % watchSources.value.length]);
                 await nextTick();
             }
