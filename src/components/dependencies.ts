@@ -74,25 +74,25 @@ export function createDependencies(
             watchCallCount++;
             console.log(watchCallCount);
 
+            function useSources(doSkip: (i: number) => boolean) {
+                const newSources = [];
+                for (let i = 0; i < sources.length; i++) {
+                    if (doSkip(i)) continue;
+                    accessSource(sources[i]);
+                    newSources.push(sources[i]);
+                }
+                return newSources;
+            }
+
             if (mutation.type === "no") {
                 // Constant dependencies
-                return sources;
+                return useSources(i => false);
             } else if (mutation.type === "little") {
                 // We skip 1 in 20 dependencies
-                const newSources = [];
-                for (let i = 0; i < sources.length; i++) {
-                    if (i % 20 === watchCallCount % 20) continue;
-                    newSources.push(sources[i]);
-                }
-                return newSources;
+                return useSources(i => i % 20 === watchCallCount % 20);
             } else {
                 // We skip 1 in 2 dependencies
-                const newSources = [];
-                for (let i = 0; i < sources.length; i++) {
-                    if (i % 2 === watchCallCount % 2) continue;
-                    newSources.push(sources[i]);
-                }
-                return newSources;
+                return useSources(i => i % 2 === watchCallCount % 2);
             }
         },
     };
@@ -105,6 +105,16 @@ export function alterSource(source: Source): void {
         source[arraySize - 1] = 100;
     } else {
         source[amountOfKeys - 1 + ""] = 100;
+    }
+}
+
+function accessSource(source: Source): void {
+    if (isRef(source)) {
+        source.value;
+    } else if (Array.isArray(source)) {
+        source[arraySize - 1];
+    } else {
+        source[amountOfKeys - 1 + ""];
     }
 }
 
