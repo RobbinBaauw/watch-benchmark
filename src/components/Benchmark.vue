@@ -2,21 +2,22 @@
     <div class="benchmark">
         <button @click="mutate">Mutate value</button>
 
-        <p v-if="previousTime !== undefined">
-            Previous time: {{ previousTime }} ms <br />
-            Watcher called {{ watcherInvocations }} times
+        <p v-if="previousDuration !== undefined">
+            Previous duration: {{ previousDuration }} ms <br />
+            Watcher called {{ watcherInvocations }} times <br />
+            Duration / watcher: {{ previousDuration / watcherInvocations }} ms
         </p>
 
         <p>
-            Amount of sources: {{ sources.length }}. <br />
-            First source: {{ sources[0] }}
+            Amount of watch sources: {{ watchSources.length }}. <br />
+            First source: {{ watchSources[0] }}
         </p>
     </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, watch, PropType, nextTick, ref } from "vue";
-import { mutateSource, createDependencies, Benchmark } from "@/components/dependencies";
+import { mutateSource, createDependencies, Benchmark, Source } from "@/components/dependencies";
 
 export default defineComponent({
     name: "Benchmark",
@@ -27,29 +28,35 @@ export default defineComponent({
         },
     },
     setup(props) {
-        let { sources, watchSource } = createDependencies(props.benchmark.sourceTypes, props.benchmark.sourceChange);
+        let { watchSources, watchSource } = createDependencies(
+            props.benchmark.sourceTypes,
+            props.benchmark.sourceChange,
+        );
 
         const watcherInvocations = ref(0);
         watch(watchSource, () => {
             watcherInvocations.value++;
         });
 
-        const previousTime = ref<number>();
+        const previousDuration = ref<number>();
+        async function mutate() {
+            watcherInvocations.value = 0;
+
+            const start = performance.now();
+            for (let i = 0; i < 10_000; i++) {
+                mutateSource(watchSources.value[i % watchSources.value.length]);
+                await nextTick();
+            }
+            const end = performance.now();
+
+            previousDuration.value = end - start;
+        }
 
         return {
-            sources,
-            previousTime,
+            watchSources,
+            previousDuration,
             watcherInvocations,
-            mutate: async () => {
-                const start = performance.now();
-                for (let i = 0; i < 10_000; i++) {
-                    mutateSource(sources[i % sources.length]);
-                    await nextTick();
-                }
-                const end = performance.now();
-
-                previousTime.value = end - start;
-            },
+            mutate,
         };
     },
 });

@@ -3,8 +3,8 @@
         Do sources change?
         <select v-model="sourceChange">
             <option value="no">No change</option>
-            <option value="little">Little change</option>
-            <option value="lots">Lots of change</option>
+            <option value="little">Little change. 5% of the sources will be changed</option>
+            <option value="lots">Lots of change. 50% of the sources will be changed</option>
         </select>
 
         <br /><br />
@@ -24,6 +24,7 @@
             Amount of objects: <input v-model="sourceTypes.objects" type="number" /> <br />
             Amount of arrays: <input v-model="sourceTypes.arrays" type="number" /> <br />
         </div>
+        <div v-else>Amount of sources: <input v-model="sourceTypes.amount" type="number" /> <br /></div>
 
         <br /><br />
 
@@ -49,9 +50,9 @@ export default defineComponent({
         const sourceChange = ref<SourceChange>("no");
         const sourceTypes = reactive<SourceTypes>({
             type: "mixed",
-            refs: 400,
-            objects: 100,
-            arrays: 100,
+            refs: 200,
+            objects: 200,
+            arrays: 200,
         });
 
         const benchmarks = ref<BenchmarkType[]>([]);
@@ -62,8 +63,34 @@ export default defineComponent({
             benchmarks,
 
             addBenchmark() {
+                let multiplier = 1;
+                if (sourceChange.value === "little") {
+                    // As 95% of the sources will remain
+                    multiplier = 1 / 0.95;
+                } else if (sourceChange.value === "lots") {
+                    // As 50% of the sources will remain
+                    multiplier = 1 / 0.5;
+                }
+
+                // To change the sources used in effects, a subset of the precreated sources is taken
+                // To be sure that the same amount of sources are used as the user asked for, make more sources than will eventually be used in the effect
+                let compensatedSourceTypes: SourceTypes;
+                if (sourceTypes.type === "mixed") {
+                    compensatedSourceTypes = {
+                        type: "mixed",
+                        refs: sourceTypes.refs * multiplier,
+                        arrays: sourceTypes.arrays * multiplier,
+                        objects: sourceTypes.objects * multiplier,
+                    };
+                } else {
+                    compensatedSourceTypes = {
+                        type: sourceTypes.type,
+                        amount: sourceTypes.amount * multiplier,
+                    };
+                }
+
                 benchmarks.value.push({
-                    sourceTypes,
+                    sourceTypes: compensatedSourceTypes,
                     sourceChange: sourceChange.value,
                 });
             },

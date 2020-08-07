@@ -27,13 +27,13 @@ export type SourceTypes =
 
 export type SourceChange = "no" | "little" | "lots";
 
-type Source = Ref<number> | Record<string, number> | Array<number>;
+export type Source = Ref<number> | Record<string, number> | Array<number>;
 
 export function createDependencies(
     sourceTypes: SourceTypes,
     sourceChange: SourceChange,
 ): {
-    sources: Source[];
+    watchSources: Ref<Source[]>;
     watchSource: WatchSource<Source[]>;
 } {
     const sources: Source[] = [];
@@ -63,9 +63,10 @@ export function createDependencies(
     }
 
     let watchCallCount = 0;
+    const watchSources = ref<Source[]>([]);
 
     return {
-        sources,
+        watchSources,
         watchSource: () => {
             watchCallCount++;
 
@@ -77,6 +78,7 @@ export function createDependencies(
                     accessSource(source);
                     newSources.push(source);
                 }
+                watchSources.value = newSources;
                 return newSources;
             }
 
@@ -102,9 +104,9 @@ export function mutateSource(source: Source): void {
     if (isRef(source)) {
         source.value++;
     } else if (Array.isArray(source)) {
-        source[arraySize - 1] = 100;
+        source[arraySize - 1]++;
     } else {
-        source[amountOfKeys - 1 + ""] = 100;
+        source[amountOfKeys - 1 + ""]++;
     }
 }
 
