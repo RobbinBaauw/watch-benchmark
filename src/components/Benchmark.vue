@@ -1,28 +1,25 @@
 <template>
     <div class="benchmark">
-        <button @click="alter">Alter value</button>
-        {{ sources }}
+        <button @click="mutate">Mutate value</button>
+        <p>Amount of sources: {{ sources.length }}</p>
+        <p>First source: {{ sources[0] }}</p>
     </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, watch } from "vue";
-import { alterSource, createDependencies } from "@/components/dependencies";
+import { defineComponent, watch, PropType } from "vue";
+import { mutateSource, createDependencies, Benchmark } from "@/components/dependencies";
 
 export default defineComponent({
     name: "Benchmark",
-    setup() {
-        let { sources, watchSource } = createDependencies(
-            {
-                type: "mixed",
-                arrays: 10,
-                objects: 90,
-                refs: 400,
-            },
-            {
-                type: "no",
-            },
-        );
+    props: {
+        benchmark: {
+            type: Object as PropType<Benchmark>,
+            required: true,
+        },
+    },
+    setup(props) {
+        let { sources, watchSource } = createDependencies(props.benchmark.sourceTypes, props.benchmark.sourceChange);
 
         watch(watchSource, () => {
             console.log("Watcher called!");
@@ -32,9 +29,8 @@ export default defineComponent({
 
         return {
             sources,
-            alter: () => {
-                clickCount++;
-                alterSource(sources[clickCount]);
+            mutate: () => {
+                mutateSource(sources[clickCount++]);
             },
         };
     },
