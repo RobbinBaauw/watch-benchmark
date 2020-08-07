@@ -68,7 +68,6 @@ export function createDependencies(
         sources,
         watchSource: () => {
             watchCallCount++;
-            console.log(watchCallCount);
 
             function useSources(doSkip: (i: number, source: Source) => boolean) {
                 const newSources = [];
