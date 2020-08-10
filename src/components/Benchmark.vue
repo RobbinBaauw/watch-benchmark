@@ -1,63 +1,74 @@
 <template>
     <div class="benchmark">
-        <button @click="mutate">Mutate value</button>
+        <button @click="run">Run benchmark</button>
 
-        <p v-if="previousDuration !== undefined">
-            Previous duration: {{ previousDuration }} ms <br />
+        <p v-if="benchmarkValue !== undefined">
+            {{ benchmarkValue }} <br />
             Watcher called {{ watcherInvocations }} times <br />
-            Duration / watcher: {{ previousDuration / watcherInvocations }} ms
-        </p>
-
-        <p>
-            Amount of watch sources: {{ watchSources.length }}. <br />
-            First source: {{ watchSources[0] }}
         </p>
     </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, watch, PropType, nextTick, ref } from "vue";
-import { mutateSource, createDependencies, Benchmark, Source } from "@/components/dependencies";
+import { defineComponent, PropType, ref } from "vue";
+import { BenchmarkOptions, DependencyCreator, VueType } from "@/components/dependencies";
 import { amountOfMutations } from "@/components/consts";
+import { Event, Suite } from "benchmark";
+
+declare const Benchmark: any;
 
 export default defineComponent({
     name: "Benchmark",
     props: {
         benchmark: {
-            type: Object as PropType<Benchmark>,
+            type: Object as PropType<BenchmarkOptions>,
             required: true,
         },
     },
     setup(props) {
-        let { watchSources, watchSource } = createDependencies(
+        const vueInstance = (window as any)[props.benchmark.vueGlobalName] as VueType;
+        if (!vueInstance) throw new Error(`${props.benchmark.vueGlobalName} was not imported!`);
+
+        const dependencyCreator = new DependencyCreator(vueInstance);
+        let { watchSources, watchSource } = dependencyCreator.createDependencies(
             props.benchmark.sourceTypes,
             props.benchmark.sourceChange,
         );
 
         const watcherInvocations = ref(0);
-        watch(watchSource, () => {
+        vueInstance.watch(watchSource, () => {
             watcherInvocations.value++;
         });
 
-        const previousDuration = ref<number>();
-        async function mutate() {
+        const benchmarkValue = ref<string>();
+        async function run() {
+            benchmarkValue.value = "Running...";
             watcherInvocations.value = 0;
 
-            const start = performance.now();
-            for (let i = 0; i < amountOfMutations; i++) {
-                mutateSource(watchSources.value[i % watchSources.value.length]);
-                await nextTick();
-            }
-            const end = performance.now();
-
-            previousDuration.value = end - start;
+            const suite = new Benchmark.Suite() as Suite;
+            suite
+                .add(
+                    "Trigger watcher",
+                    async () => {
+                        for (let i = 0; i < amountOfMutations; i++) {
+                            dependencyCreator.mutateSource(watchSources.value[i % watchSources.value.length]);
+                            await vueInstance.nextTick();
+                        }
+                    },
+                    {
+                        onComplete: ({ target }: Event) => {
+                            benchmarkValue.value = `${Math.round(target.hz!)} ops/s ± ${target.stats!.rme.toFixed(2)}`;
+                        },
+                    },
+                )
+                .run({ async: true });
         }
 
         return {
             watchSources,
-            previousDuration,
+            benchmarkValue,
             watcherInvocations,
-            mutate,
+            run,
         };
     },
 });

@@ -1,30 +1,78 @@
 <template>
     <div id="app">
-        Do sources change?
-        <select v-model="sourceChange">
-            <option value="no">No change</option>
-            <option value="little">Little change. 5% of the sources will be changed</option>
-            <option value="lots">Lots of change. 50% of the sources will be changed</option>
-        </select>
+        <label
+            >Import:
+            <input v-model="currentVueImport" />
+        </label>
 
         <br /><br />
 
-        Sources to use:
-        <select v-model="sourceTypes.type">
-            <option value="mixed">Mixed</option>
-            <option value="ref">Only refs</option>
-            <option value="object">Only objects</option>
-            <option value="array">Only arrays</option>
-        </select>
+        Imported Vue instances:
+        <ul v-if="vueImports.size > 0">
+            <li v-for="link in vueImports" :key="link">{{ link }}</li>
+        </ul>
+        <p v-else>Nothing imported yet!</p>
+
+        <br />
+
+        <button @click="loadScript">Import Vue</button>
+
+        <hr />
+
+        <label
+            >Do sources change?
+            <select v-model="sourceChange">
+                <option value="no">No change</option>
+                <option value="little">Little change. 5% of the sources will be changed</option>
+                <option value="lots">Lots of change. 50% of the sources will be changed</option>
+            </select>
+        </label>
+
+        <br /><br />
+
+        <label>
+            Sources to use:
+            <select v-model="sourceTypes.type" name="sourceType">
+                <option value="mixed">Mixed</option>
+                <option value="ref">Only refs</option>
+                <option value="object">Only objects</option>
+                <option value="array">Only arrays</option>
+            </select>
+        </label>
 
         <br /><br />
 
         <div v-if="sourceTypes.type === 'mixed'">
-            Amount of refs: <input v-model="sourceTypes.refs" type="number" /> <br />
-            Amount of objects: <input v-model="sourceTypes.objects" type="number" /> <br />
-            Amount of arrays: <input v-model="sourceTypes.arrays" type="number" /> <br />
+            <label
+                >Amount of refs:
+                <input v-model="sourceTypes.refs" type="number" />
+            </label>
+            <br />
+            <label
+                >Amount of objects:
+                <input v-model="sourceTypes.objects" type="number" />
+            </label>
+            <br />
+            <label
+                >Amount of arrays:
+                <input v-model="sourceTypes.arrays" type="number" />
+            </label>
+            <br />
         </div>
-        <div v-else>Amount of sources: <input v-model="sourceTypes.amount" type="number" /> <br /></div>
+        <div v-else>
+            <label
+                >Amount of sources:
+                <input v-model="sourceTypes.amount" type="number" />
+            </label>
+            <br />
+        </div>
+
+        <br /><br />
+
+        <label
+            >Vue global name:
+            <input v-model="vueGlobalName" />
+        </label>
 
         <br /><br />
 
@@ -39,7 +87,7 @@
 <script lang="ts">
 import { defineComponent, ref, reactive } from "vue";
 import Benchmark from "./components/Benchmark.vue";
-import { SourceChange, SourceTypes, Benchmark as BenchmarkType } from "./components/dependencies";
+import { SourceChange, SourceTypes, BenchmarkOptions as BenchmarkType } from "./components/dependencies";
 
 export default defineComponent({
     name: "App",
@@ -54,13 +102,33 @@ export default defineComponent({
             objects: 200,
             arrays: 200,
         });
+        const vueGlobalName = ref("Vue");
 
         const benchmarks = ref<BenchmarkType[]>([]);
+
+        const vueImports = ref<Set<string>>(new Set());
+        const currentVueImport = ref("https://unpkg.com/vue@3.0.0-rc.5/dist/vue.global.prod.js");
 
         return {
             sourceChange,
             sourceTypes,
+            vueGlobalName,
+
             benchmarks,
+
+            vueImports,
+            currentVueImport,
+
+            loadScript() {
+                if (!vueImports.value.has(currentVueImport.value)) {
+                    const script = document.createElement("script");
+                    script.type = "application/javascript";
+                    script.src = currentVueImport.value;
+                    document.body.appendChild(script);
+
+                    vueImports.value.add(currentVueImport.value);
+                }
+            },
 
             addBenchmark() {
                 let multiplier = 1;
@@ -92,6 +160,7 @@ export default defineComponent({
                 benchmarks.value.push({
                     sourceTypes: compensatedSourceTypes,
                     sourceChange: sourceChange.value,
+                    vueGlobalName: vueGlobalName.value,
                 });
             },
         };

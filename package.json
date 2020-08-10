@@ -12,6 +12,8 @@
     },
     "devDependencies": {
         "@robbinbaauw/eslint-config": "^0.0.1",
+        "@types/benchmark": "^1.0.33",
+        "@types/lodash": "^4.14.159",
         "@typescript-eslint/eslint-plugin": "^3.8.0",
         "@typescript-eslint/parser": "^3.8.0",
         "@vue/cli-plugin-eslint": "~4.5.0",

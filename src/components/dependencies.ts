@@ -1,14 +1,11 @@
-import { Ref, ref, reactive, WatchSource, isRef } from "vue";
+import Vue, { Ref, WatchSource } from "vue";
 import { braidArrays, range } from "./util";
 import { amountOfKeys, arraySize } from "@/components/consts";
 
-// Amount => 1, 8, 20, 500
-// Type => ref, reactive, arrays
-// Changing => constant, little change, much change
-
-export type Benchmark = {
+export type BenchmarkOptions = {
     sourceTypes: SourceTypes;
     sourceChange: SourceChange;
+    vueGlobalName: string;
 };
 
 export type SourceTypes =
@@ -27,117 +24,123 @@ export type SourceChange = "no" | "little" | "lots";
 
 export type Source = Ref<number> | Record<string, number> | Array<number>;
 
-export function createDependencies(
-    sourceTypes: SourceTypes,
-    sourceChange: SourceChange,
-): {
-    watchSources: Ref<Source[]>;
-    watchSource: WatchSource<Source[]>;
-} {
-    const sources: Source[] = [];
-    switch (sourceTypes.type) {
-        case "mixed": {
-            const refs = createRefs(sourceTypes.refs);
-            const objects = createObjects(sourceTypes.objects);
-            const arrays = createArrays(sourceTypes.arrays);
+export type VueType = typeof Vue;
 
-            // Intertwine the sources, so we arbitrarily remove sources later
-            sources.push(...braidArrays<Source>(refs, objects, arrays));
+export class DependencyCreator {
+    constructor(public readonly vueInstance: VueType) {}
 
-            break;
-        }
-        case "array": {
-            sources.push(...createArrays(sourceTypes.amount));
-            break;
-        }
-        case "object": {
-            sources.push(...createObjects(sourceTypes.amount));
-            break;
-        }
-        case "ref": {
-            sources.push(...createRefs(sourceTypes.amount));
-            break;
-        }
-    }
+    createDependencies(
+        sourceTypes: SourceTypes,
+        sourceChange: SourceChange,
+    ): {
+        watchSources: Ref<Source[]>;
+        watchSource: WatchSource<Source[]>;
+    } {
+        const sources: Source[] = [];
+        switch (sourceTypes.type) {
+            case "mixed": {
+                const refs = this.createRefs(sourceTypes.refs);
+                const objects = this.createObjects(sourceTypes.objects);
+                const arrays = this.createArrays(sourceTypes.arrays);
 
-    let watchCallCount = 0;
-    const watchSources = ref<Source[]>([]);
+                // Intertwine the sources, so we arbitrarily remove sources later
+                sources.push(...braidArrays<Source>(refs, objects, arrays));
 
-    return {
-        watchSources,
-        watchSource: () => {
-            watchCallCount++;
-
-            function useSources(doSkip: (i: number, source: Source) => boolean) {
-                const newSources = [];
-                for (let i = 0; i < sources.length; i++) {
-                    const source = sources[i];
-                    if (doSkip(i, source)) continue;
-                    accessSource(source);
-                    newSources.push(source);
-                }
-                watchSources.value = newSources;
-                return newSources;
+                break;
             }
-
-            switch (sourceChange) {
-                case "no": {
-                    // Constant dependencies
-                    return useSources(() => false);
-                }
-                case "little": {
-                    // We skip 1 in 20 dependencies in a rotating fashion
-                    return useSources((i) => i % 20 === watchCallCount % 20);
-                }
-                case "lots": {
-                    // We skip 1 in 2 dependencies in a rotating fashion
-                    return useSources((i) => i % 2 === watchCallCount % 2);
-                }
+            case "array": {
+                sources.push(...this.createArrays(sourceTypes.amount));
+                break;
             }
-        },
-    };
-}
-
-export function mutateSource(source: Source): void {
-    if (isRef(source)) {
-        source.value++;
-    } else if (Array.isArray(source)) {
-        source[arraySize - 1]++;
-    } else {
-        source[amountOfKeys - 1 + ""]++;
-    }
-}
-
-function accessSource(source: Source): void {
-    if (isRef(source)) {
-        source.value;
-    } else if (Array.isArray(source)) {
-        source[arraySize - 1];
-    } else {
-        source[amountOfKeys - 1 + ""];
-    }
-}
-
-function createRefs(amount: number): Ref<number>[] {
-    return range(amount).map((it) => ref(it));
-}
-
-function createObjects(amount: number): Record<string, number>[] {
-    return range(amount).map((it) => {
-        const obj: Record<string, number> = {};
-        for (let i = 0; i < amountOfKeys; i++) {
-            obj["" + i] = i * it;
+            case "object": {
+                sources.push(...this.createObjects(sourceTypes.amount));
+                break;
+            }
+            case "ref": {
+                sources.push(...this.createRefs(sourceTypes.amount));
+                break;
+            }
         }
-        return reactive(obj);
-    });
-}
 
-function createArrays(amount: number): number[][] {
-    return range(amount).map((it) => {
-        const arr = Array(arraySize);
-        for (let i = 0; i < arraySize; i++) {
-            arr[i] = i * it;
+        let watchCallCount = 0;
+        const watchSources = this.vueInstance.ref<Source[]>(sources);
+
+        return {
+            watchSources,
+            watchSource: () => {
+                watchCallCount++;
+
+                const useSources = (doSkip: (i: number, source: Source) => boolean) => {
+                    const newSources = [];
+                    for (let i = 0; i < sources.length; i++) {
+                        const source = sources[i];
+                        if (doSkip(i, source)) continue;
+                        this.accessSource(source);
+                        newSources.push(source);
+                    }
+                    watchSources.value = newSources;
+                    return newSources;
+                };
+
+                switch (sourceChange) {
+                    case "no": {
+                        // Constant dependencies
+                        return useSources(() => false);
+                    }
+                    case "little": {
+                        // We skip 1 in 20 dependencies in a rotating fashion
+                        return useSources((i) => i % 20 === watchCallCount % 20);
+                    }
+                    case "lots": {
+                        // We skip 1 in 2 dependencies in a rotating fashion
+                        return useSources((i) => i % 2 === watchCallCount % 2);
+                    }
+                }
+            },
+        };
+    }
+
+    mutateSource(source: Source): void {
+        if (this.vueInstance.isRef(source)) {
+            source.value++;
+        } else if (Array.isArray(source)) {
+            source[arraySize - 1]++;
+        } else {
+            source[amountOfKeys - 1 + ""]++;
         }
-        return reactive(arr);
-    });
+    }
+
+    private accessSource(source: Source): void {
+        if (this.vueInstance.isRef(source)) {
+            source.value;
+        } else if (Array.isArray(source)) {
+            source[arraySize - 1];
+        } else {
+            source[amountOfKeys - 1 + ""];
+        }
+    }
+
+    private createRefs(amount: number): Ref<number>[] {
+        return range(amount).map((it) => this.vueInstance.ref(it));
+    }
+
+    private createObjects(amount: number): Record<string, number>[] {
+        return range(amount).map((it) => {
+            const obj: Record<string, number> = {};
+            for (let i = 0; i < amountOfKeys; i++) {
+                obj["" + i] = i * it;
+            }
+            return this.vueInstance.reactive(obj);
+        });
+    }
+
+    private createArrays(amount: number): number[][] {
+        return range(amount).map((it) => {
+            const arr = Array(arraySize);
+            for (let i = 0; i < arraySize; i++) {
+                arr[i] = i * it;
+            }
+            return this.vueInstance.reactive(arr);
+        });
+    }
 }
